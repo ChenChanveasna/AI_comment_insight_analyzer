@@ -1,6 +1,3 @@
-# AI_comment_insight_analyzer
-A web-based AI comment analysis system for YouTube URLs, featuring sentiment insights, topic extraction, and exportable results.
-
 # AI Comment Insight Analyzer
 
 AI Comment Insight Analyzer is a simple web-based project that helps users understand the overall sentiment of comments from a YouTube video.
