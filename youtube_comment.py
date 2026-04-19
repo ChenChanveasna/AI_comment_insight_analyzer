@@ -16,6 +16,9 @@ def get_video_id(url):
     return video_id_search.group(1) if video_id_search else None
 
 def fetch_comments(video_id):
+    if not API_KEY:
+        raise RuntimeError("YOUTUBE_API_KEY is not set.")
+
     youtube = build("youtube", "v3", developerKey=API_KEY)
     comments = []
     
@@ -30,9 +33,10 @@ def fetch_comments(video_id):
     while request:
         response = request.execute()
 
-        for item in response['items']:
-            comment = item['snippet']['topLevelComment']['snippet']['textDisplay']
-            user = item['snippet']['topLevelComment']['snippet']['authorDisplayName']
+        for item in response.get('items', []):
+            snippet = item['snippet']['topLevelComment']['snippet']
+            comment = snippet.get('textDisplay', '')
+            user = snippet.get('authorDisplayName', 'Unknown')
             comments.append(f"{user}: {comment}")
 
         # Check if there is another page of comments
