@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Comment Insight Analyzer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="page-bg">
+    <div class="orb orb-a"></div>
+    <div class="orb orb-b"></div>
+    <div class="orb orb-c"></div>
+  </div>
+
+  <main class="shell">
+    <section class="hero card">
+      <form class="url-form" method="get" action="/">
+        <h1>AI Comment Insight Analyzer</h1>
+        <p class="hero-description">
+          Paste a YouTube video link to refresh the page and load analytics for the new video comments.
+        </p>
+        <div class="input-row">
+          <input
+            id="youtube_url"
+            name="youtube_url"
+            type="url"
+            placeholder="https://www.youtube.com/watch?v=..."
+            value="{{ youtube_url }}"
+            required
+          >
+          <button type="submit" class="scan-btn">Scan</button>
+        </div>
+      </form>
+    </section>
+
+    {% if error %}
+      <section class="alert card alert-error">
+        <h2>Something needs attention</h2>
+        <p>{{ error }}</p>
+      </section>
+    {% endif %}
+
+    {% if info %}
+      <section class="alert card alert-success">
+        <p>{{ info }}</p>
+      </section>
+    {% endif %}
+
+    {% if analysis %}
+      <section class="verdict-box card verdict-{{ analysis.reaction_label }}">
+        {% if analysis.reaction_label == "positive" %}
+          <strong>People mostly like this video.</strong>
+          <p>The comments show a positive overall reaction from viewers.</p>
+        {% elif analysis.reaction_label == "negative" %}
+          <strong>People mostly dislike this video.</strong>
+          <p>The comments trend negative, with many critical reactions.</p>
+        {% else %}
+          <strong>People have mixed opinions about this video.</strong>
+          <p>The comments are balanced between positive and negative sentiment.</p>
+        {% endif %}
+      </section>
+
+      <section class="stats-grid">
+        <article class="stat card">
+          <span>Comments analyzed</span>
+          <strong>{{ analysis.total_comments }}</strong>
+        </article>
+        <article class="stat card">
+          <span>Unique commenters</span>
+          <strong>{{ analysis.unique_commenters }}</strong>
+        </article>
+        <article class="stat card">
+          <span>Average length</span>
+          <strong>{{ analysis.average_words }} words</strong>
+        </article>
+        <article class="stat card">
+          <span>Viewer verdict</span>
+          {% if analysis.reaction_label == "positive" %}
+            <strong>Like</strong>
+          {% elif analysis.reaction_label == "negative" %}
+            <strong>Dislike</strong>
+          {% else %}
+            <strong>Mixed</strong>
+          {% endif %}
+        </article>
+      </section>
+
+      <section class="chart-grid">
+        <article class="card panel">
+          <div class="panel-head">
+            <h2>Sentiment split</h2>
+            <p>How the audience feels overall.</p>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="sentimentChart"></canvas>
+          </div>
+        </article>
+
+        <article class="card panel">
+          <div class="panel-head">
+            <h2>Top recurring words</h2>
+            <p>Frequently repeated topics in the conversation.</p>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="wordsChart"></canvas>
+          </div>
+        </article>
+      </section>
+
+      <section class="summary-grid">
+        <article class="card panel summary-panel">
+          <div class="panel-head">
+            <h2>Insight summary</h2>
+            <p>Quick read on the comment thread.</p>
+          </div>
+          <p class="summary-text">{{ analysis.summary }}</p>
+          <div class="tag-row">
+            {% for word, count in analysis.top_words %}
+              <span class="tag">{{ word }} <em>{{ count }}</em></span>
+            {% endfor %}
+          </div>
+        </article>
+
+        <article class="card panel examples-panel">
+          <div class="panel-head">
+            <h2>Example comments</h2>
+            <p>Best and worst signals from the data.</p>
+          </div>
+
+          <div class="example-columns">
+            <div>
+              <h3>Positive examples</h3>
+              {% for record in analysis.positive_examples %}
+                <div class="example example-positive">
+                  <strong>{{ record.user }}</strong>
+                  <p>{{ record.text }}</p>
+                </div>
+              {% endfor %}
+            </div>
+
+            <div>
+              <h3>Negative examples</h3>
+              {% for record in analysis.negative_examples %}
+                <div class="example example-negative">
+                  <strong>{{ record.user }}</strong>
+                  <p>{{ record.text }}</p>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <script>
+        window.__ANALYTICS__ = {{ chart_data | tojson }};
+      </script>
+    {% endif %}
+  </main>
+
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
