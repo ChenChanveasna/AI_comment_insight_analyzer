@@ -1,6 +1,17 @@
 from collections import Counter
+from functools import lru_cache
+import os
 import re
 
+from dotenv import load_dotenv
+from tqdm import tqdm
+from transformers import pipeline
+
+
+load_dotenv()
+
+
+MODEL_NAME = os.getenv("SENTIMENT_MODEL_NAME", "finiteautomata/bertweet-base-sentiment-analysis")
 
 STOPWORDS = {
     "a", "about", "after", "again", "all", "also", "am", "and", "any", "are", "as", "at", "be", "because",
@@ -12,18 +23,6 @@ STOPWORDS = {
     "their", "theirs", "them", "themselves", "then", "there", "these", "they", "this", "those", "through", "to",
     "too", "under", "until", "up", "very", "was", "we", "were", "what", "when", "where", "which", "while",
     "who", "whom", "why", "with", "would", "you", "your", "yours", "yourself", "yourselves",
-}
-
-POSITIVE_WORDS = {
-    "amazing", "awesome", "best", "brilliant", "clean", "cool", "enjoy", "excellent", "fantastic", "good", "great",
-    "helpful", "incredible", "love", "lovely", "nice", "perfect", "smart", "super", "useful", "well", "wow", "liked",
-    "like", "favourite", "favorite", "thanks", "thank",
-}
-
-NEGATIVE_WORDS = {
-    "annoying", "bad", "boring", "broken", "confusing", "disappointing", "dreadful", "error", "hate", "horrible",
-    "ignore", "lag", "laggy", "lame", "mess", "nonsense", "poor", "problem", "sad", "slow", "stupid", "terrible",
-    "ugly", "waste", "weak", "worst", "bug", "bugs", "crash", "crashes", "useless",
 }
 
 
@@ -42,47 +41,52 @@ def tokenize(text):
     return re.findall(r"[a-z']+", text.lower())
 
 
-def classify_comment(text):
+def normalize_label(label):
+    normalized = label.upper().replace("LABEL_", "")
+    if normalized in {"POS", "POSITIVE", "1"}:
+        return "positive"
+    if normalized in {"NEG", "NEGATIVE", "0"}:
+        return "negative"
+    return "neutral"
+
+
+@lru_cache(maxsize=1)
+def get_sentiment_model():
+    return pipeline("sentiment-analysis", model=MODEL_NAME)
+
+
+def classify_comment(text, analyzer):
     tokens = tokenize(text)
-    positive_hits = sum(token in POSITIVE_WORDS for token in tokens)
-    negative_hits = sum(token in NEGATIVE_WORDS for token in tokens)
-
-    if positive_hits > negative_hits:
-        label = "positive"
-    elif negative_hits > positive_hits:
-        label = "negative"
-    else:
-        label = "neutral"
-
-    total_hits = positive_hits + negative_hits
-    confidence = 0.5 if total_hits == 0 else round(0.5 + (abs(positive_hits - negative_hits) / total_hits) * 0.5, 3)
+    prediction = analyzer(text[:128], truncation=True)[0]
+    label = normalize_label(prediction.get("label", "neutral"))
+    confidence = round(float(prediction.get("score", 0.0)), 3)
+    score = confidence if label == "positive" else (-confidence if label == "negative" else 0.0)
 
     return {
         "label": label,
         "confidence": confidence,
-        "positive_hits": positive_hits,
-        "negative_hits": negative_hits,
+        "score": score,
         "tokens": tokens,
     }
 
 
 def analyze_comments(comment_entries):
+    analyzer = get_sentiment_model()
     records = []
 
-    for entry in comment_entries:
+    for entry in tqdm(comment_entries, desc="Analyzing comments", unit="comment"):
         user, text = split_comment_entry(entry)
         if not text:
             continue
 
-        classification = classify_comment(text)
-        score = classification["positive_hits"] - classification["negative_hits"]
+        classification = classify_comment(text, analyzer)
         records.append(
             {
                 "user": user,
                 "text": text,
                 "label": classification["label"],
                 "confidence": classification["confidence"],
-                "score": score,
+                "score": classification["score"],
                 "word_count": len(classification["tokens"]),
                 "tokens": classification["tokens"],
             }
